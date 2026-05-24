@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+
+downloads/
+*.mp3
+*.m4a
+*.webm
+*.part
+
+songs.txt
+.env

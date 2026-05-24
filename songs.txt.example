@@ -1,0 +1,8 @@
+# Una canzone per riga.
+# Formati accettati:
+#   Artista - Titolo
+#   Artista; Titolo
+#   Artista | Titolo
+#
+# Esempio:
+#   Artista di esempio - Titolo di esempio
