@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-Scarica in MP3 audio da YouTube partendo da una lista di brani.
+Download MP3 audio from YouTube using a plain-text list of songs.
 
-Uso previsto: solo contenuti che possiedi, che sono di pubblico dominio,
-Creative Commons, o per cui hai esplicita autorizzazione al download.
+Intended use: only download content you own, content in the public domain,
+Creative Commons content, or content you have explicit permission to download.
 
-Formato file input:
-  Una canzone per riga, ad esempio:
-    Artista   Titolo     
-    Artista - Titolo
-    Artista;  Titolo
-    Artista | Titolo
+Input file format:
+  One song per line, for example:
+    Artist - Title
+    Artist; Title
+    Artist | Title
 
-Righe vuote e righe che iniziano con # vengono ignorate.
+Blank lines and lines starting with # are ignored.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ DEFAULT_OUTPUT_DIR = "downloads"
 
 def load_queries(input_file: Path) -> list[str]:
     if not input_file.exists():
-        raise FileNotFoundError(f"File non trovato: {input_file}")
+        raise FileNotFoundError(f"File not found: {input_file}")
 
     queries: list[str] = []
 
@@ -43,7 +42,7 @@ def load_queries(input_file: Path) -> list[str]:
 
             normalized = normalize_song_line(line)
             if not normalized:
-                print(f"[WARN] Riga {line_number} ignorata: {line}")
+                print(f"[WARN] Skipped line {line_number}: {line}")
                 continue
 
             queries.append(normalized)
@@ -52,7 +51,7 @@ def load_queries(input_file: Path) -> list[str]:
 
 
 def normalize_song_line(line: str) -> str:
-    """Converte separatori comuni in una query pulita per YouTube."""
+    """Convert common separators into a clean YouTube search query."""
     for separator in (";", "|", ","):
         if separator in line:
             parts = [part.strip() for part in line.split(separator) if part.strip()]
@@ -86,15 +85,15 @@ def check_dependencies() -> Path:
         import yt_dlp  # noqa: F401
     except ImportError as exc:
         raise RuntimeError(
-            "Manca yt-dlp. Installa la dipendenza con:\n"
+            "yt-dlp is missing. Install the dependency with:\n"
             "  python -m pip install -U yt-dlp"
         ) from exc
 
     ffmpeg_path = find_ffmpeg()
     if ffmpeg_path is None:
         raise RuntimeError(
-            "Manca ffmpeg, necessario per convertire in MP3.\n"
-            "Installa ffmpeg e assicurati che il comando 'ffmpeg' sia nel PATH."
+            "ffmpeg is missing, and it is required to convert audio to MP3.\n"
+            "Install ffmpeg and make sure the 'ffmpeg' command is available in PATH."
         )
 
     return ffmpeg_path
@@ -136,29 +135,29 @@ def download_mp3(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Cerca brani da un file di testo e li scarica da YouTube in MP3."
+        description="Search songs from a text file and download them from YouTube as MP3."
     )
     parser.add_argument(
         "-i",
         "--input",
         default=DEFAULT_INPUT_FILE,
-        help=f"File con la lista di canzoni/autori. Default: {DEFAULT_INPUT_FILE}",
+        help=f"Text file with the song/artist list. Default: {DEFAULT_INPUT_FILE}",
     )
     parser.add_argument(
         "-o",
         "--output",
         default=DEFAULT_OUTPUT_DIR,
-        help=f"Cartella dove salvare gli MP3. Default: {DEFAULT_OUTPUT_DIR}",
+        help=f"Folder where MP3 files will be saved. Default: {DEFAULT_OUTPUT_DIR}",
     )
     parser.add_argument(
         "--no-archive",
         action="store_true",
-        help="Non usare il file archivio per evitare download duplicati.",
+        help="Do not use the archive file that prevents duplicate downloads.",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Mostra le query che verrebbero cercate, senza scaricare nulla.",
+        help="Show the queries that would be searched without downloading anything.",
     )
     return parser.parse_args()
 
@@ -173,14 +172,14 @@ def main() -> int:
     try:
         queries = load_queries(input_file)
     except OSError as exc:
-        print(f"[ERRORE] {exc}", file=sys.stderr)
+        print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
 
     if not queries:
-        print("[INFO] Nessun brano trovato nel file di input.")
+        print("[INFO] No songs found in the input file.")
         return 0
 
-    print(f"[INFO] Brani trovati: {len(queries)}")
+    print(f"[INFO] Songs found: {len(queries)}")
 
     if args.dry_run:
         for query in queries:
@@ -190,20 +189,20 @@ def main() -> int:
     try:
         ffmpeg_path = check_dependencies()
     except RuntimeError as exc:
-        print(f"[ERRORE] {exc}", file=sys.stderr)
+        print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[INFO] FFmpeg: {ffmpeg_path}")
 
     for index, query in enumerate(queries, start=1):
-        print(f"\n[{index}/{len(queries)}] Cerco e scarico: {query}")
+        print(f"\n[{index}/{len(queries)}] Searching and downloading: {query}")
         try:
             download_mp3(query, output_dir, archive_file, ffmpeg_path)
-        except Exception as exc:  # yt-dlp solleva eccezioni diverse in base all'errore.
-            print(f"[ERRORE] Download fallito per '{query}': {exc}", file=sys.stderr)
+        except Exception as exc:  # yt-dlp raises different exceptions depending on the error.
+            print(f"[ERROR] Download failed for '{query}': {exc}", file=sys.stderr)
 
-    print(f"\n[FATTO] File salvati in: {output_dir}")
+    print(f"\n[DONE] Files saved in: {output_dir}")
     return 0
 
 

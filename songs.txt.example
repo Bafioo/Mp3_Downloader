@@ -1,8 +1,8 @@
-# Una canzone per riga.
-# Formati accettati:
-#   Artista - Titolo
-#   Artista; Titolo
-#   Artista | Titolo
+# One song per line.
+# Accepted formats:
+#   Artist - Title
+#   Artist; Title
+#   Artist | Title
 #
-# Esempio:
-#   Artista di esempio - Titolo di esempio
+# Example:
+#   Example Artist - Example Title
