@@ -35,7 +35,7 @@ After installing ffmpeg, restart your terminal so the updated PATH is loaded.
 Clone the repository and install the Python dependency:
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/Mp3_Downloader.git
+git clone https://github.com/Bafioo/Mp3_Downloader.git
 cd Mp3_Downloader
 python -m pip install -U -r requirements.txt
 ```
@@ -94,11 +94,11 @@ the same YouTube video more than once.
 
 ```text
 .
-├── mp3_download.py      # Main downloader script
-├── requirements.txt     # Python dependency list
-├── songs.txt.example    # Example input file
-├── README.md
-└── .gitignore
+|-- mp3_download.py      # Main downloader script
+|-- requirements.txt     # Python dependency list
+|-- songs.txt.example    # Example input file
+|-- README.md
+`-- .gitignore
 ```
 
 ## Legal Notice
