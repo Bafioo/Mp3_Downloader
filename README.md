@@ -22,21 +22,58 @@ once.
 - [`ffmpeg`](https://ffmpeg.org/) installed and available in your system PATH
 - Python dependencies from `requirements.txt`
 
+On macOS, install ffmpeg with Homebrew:
+
+```shell
+brew install ffmpeg
+```
+
 On Windows, you can install ffmpeg with:
 
 ```powershell
 winget install --id Gyan.FFmpeg -e
 ```
 
-After installing ffmpeg, restart your terminal so the updated PATH is loaded.
+After installing ffmpeg, open a new terminal if the `ffmpeg` command is not
+found immediately.
 
 ## Installation
 
-Clone the repository and install the Python dependency:
+Clone the repository:
 
-```powershell
+```shell
 git clone https://github.com/Bafioo/Mp3_Downloader.git
 cd Mp3_Downloader
+```
+
+Check that your Python version satisfies the requirement:
+
+```shell
+python3 --version
+```
+
+On macOS, `/usr/bin/python3` may report Python 3.9, which is too old for the
+current `yt-dlp` dependency. If so, install Python with Homebrew and create the
+virtual environment with the Homebrew interpreter:
+
+```shell
+brew install python
+"$(brew --prefix)/bin/python3" -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows, create and activate a virtual environment with Python 3.10 or
+newer:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install the Python dependency inside the activated virtual environment:
+
+```shell
+python -m pip install -U pip
 python -m pip install -U -r requirements.txt
 ```
 
@@ -54,6 +91,14 @@ Blank lines and lines starting with `#` are ignored.
 
 You can start from the included template:
 
+On macOS:
+
+```shell
+cp songs.txt.example songs.txt
+```
+
+On Windows:
+
 ```powershell
 copy .\songs.txt.example .\songs.txt
 ```
@@ -62,17 +107,43 @@ copy .\songs.txt.example .\songs.txt
 
 Preview the YouTube search queries without downloading anything:
 
+On macOS:
+
+```shell
+source .venv/bin/activate
+python mp3_download.py --dry-run
+```
+
+On Windows:
+
 ```powershell
+.\.venv\Scripts\Activate.ps1
 python .\mp3_download.py --dry-run
 ```
 
 Download the MP3 files into the default `downloads` folder:
+
+On macOS:
+
+```shell
+python mp3_download.py
+```
+
+On Windows:
 
 ```powershell
 python .\mp3_download.py
 ```
 
 Use a custom input file or output folder:
+
+On macOS:
+
+```shell
+python mp3_download.py -i my_songs.txt -o music
+```
+
+On Windows:
 
 ```powershell
 python .\mp3_download.py -i .\my_songs.txt -o .\music
