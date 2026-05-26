@@ -121,16 +121,6 @@ python .\mp3_download.py -i .\my_songs.txt -o .\music
 By default, the script creates `downloads/downloaded.txt` to avoid downloading
 the same YouTube video more than once.
 
-## Code Walkthrough
-
-For a detailed explanation of the script's structure and behavior, refer to
-[`CODE_WALKTHROUGH.md`](CODE_WALKTHROUGH.md). It provides a practical,
-line-by-line overview intended to make the implementation easier to understand
-and maintain.
-
-For future maintainers or AI-assisted continuation work, see
-[`LLM_HANDOFF.md`](LLM_HANDOFF.md).
-
 ## Project Structure
 
 ```text
@@ -139,9 +129,7 @@ For future maintainers or AI-assisted continuation work, see
 |-- mp3_downloader_gui.py  # Desktop GUI
 |-- Images/
 |   `-- icon.png         # GUI icon
-|-- CODE_WALKTHROUGH.md  # Detailed script explanation
 |-- SETUP_COMMANDS.md    # Cross-platform setup commands
-|-- LLM_HANDOFF.md       # Continuation briefing for another LLM/developer
 |-- requirements.txt     # Python dependency list
 |-- songs.txt.example    # Example input file
 |-- README.md

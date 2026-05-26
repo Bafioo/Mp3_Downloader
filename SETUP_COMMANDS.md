@@ -39,9 +39,16 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
+`requirements.txt` installs `yt-dlp`. To install or update it directly:
+
+```powershell
+python -m pip install --upgrade yt-dlp
+```
+
 Verify the installation:
 
 ```powershell
+python -m yt_dlp --version
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
 python -m py_compile .\mp3_download.py .\mp3_downloader_gui.py
@@ -90,9 +97,16 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
+`requirements.txt` installs `yt-dlp`. To install or update it directly:
+
+```bash
+python -m pip install --upgrade yt-dlp
+```
+
 Verify the installation:
 
 ```bash
+python -m yt_dlp --version
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
@@ -129,6 +143,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m pip install --upgrade yt-dlp
+python -m yt_dlp --version
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
@@ -142,6 +158,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m pip install --upgrade yt-dlp
+python -m yt_dlp --version
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
@@ -158,9 +176,32 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m pip install --upgrade yt-dlp
+python -m yt_dlp --version
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
+```
+
+## yt-dlp Notes
+
+`yt-dlp` is the Python library and command-line engine used to search YouTube
+and download audio streams. This project installs it through:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+To update only `yt-dlp` later:
+
+```bash
+python -m pip install --upgrade yt-dlp
+```
+
+To check the installed version:
+
+```bash
+python -m yt_dlp --version
 ```
 
 Run the GUI:
@@ -195,4 +236,3 @@ Run a static security scan on the Python code:
 ```bash
 python -m bandit -r . -x .git,.venv,venv,env,__pycache__,downloads
 ```
-
