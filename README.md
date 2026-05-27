@@ -1,7 +1,8 @@
 # MP3 Downloader
 
-MP3 Downloader is a small Python command-line tool that reads a list of songs,
-searches YouTube for each entry, and saves the best audio result as an MP3 file.
+MP3 Downloader is a small Python tool that reads a list of songs, searches
+YouTube for each entry, and saves the best audio result as an MP3 file. It can
+be used from the command line or through a simple desktop interface.
 
 It is built on top of [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and `ffmpeg`,
 with a simple text-file workflow that makes it easy to process many tracks at
@@ -10,6 +11,9 @@ once.
 ## Features
 
 - Read songs from a plain-text file
+- Use a simple GUI to choose the song list and output folder
+- Download direct YouTube links without creating a song-list file
+- Display a custom app icon in the desktop interface
 - Search YouTube automatically using the artist and title
 - Convert downloaded audio to MP3
 - Skip duplicate downloads with a local archive file
@@ -21,6 +25,11 @@ once.
 - Python 3.10 or newer
 - [`ffmpeg`](https://ffmpeg.org/) installed and available in your system PATH
 - Python dependencies from `requirements.txt`
+- Tkinter for the desktop GUI
+
+Tkinter is included with the standard Python installer on Windows and macOS. On
+some Linux distributions, it may need to be installed separately, for example
+with `sudo apt install python3-tk`.
 
 On macOS, install ffmpeg with Homebrew:
 
@@ -77,6 +86,9 @@ python -m pip install -U pip
 python -m pip install -U -r requirements.txt
 ```
 
+For complete Windows, macOS, and Linux setup commands, see
+[`SETUP_COMMANDS.md`](SETUP_COMMANDS.md).
+
 ## Song List
 
 Create a `songs.txt` file in the project folder. Add one song per line:
@@ -104,6 +116,25 @@ copy .\songs.txt.example .\songs.txt
 ```
 
 ## Usage
+
+### Desktop GUI
+
+Launch the graphical interface:
+
+```powershell
+python .\mp3_downloader_gui.py
+```
+
+From the GUI you can:
+
+- Choose the output folder for downloaded MP3 files
+- Select a text file containing song names from the **Song list** tab
+- Paste one or more direct YouTube URLs from the **YouTube links** tab, using one link per line
+- Enable or disable duplicate-download tracking
+- Read an activity log with the current download title, estimated time remaining, and completion status
+- Start the download without typing command-line arguments
+
+### Command Line
 
 Preview the YouTube search queries without downloading anything:
 
@@ -161,19 +192,15 @@ python .\mp3_download.py -i .\my_songs.txt -o .\music
 By default, the script creates `downloads/downloaded.txt` to avoid downloading
 the same YouTube video more than once.
 
-## Code Walkthrough
-
-For a detailed explanation of the script's structure and behavior, refer to
-[`CODE_WALKTHROUGH.md`](CODE_WALKTHROUGH.md). It provides a practical,
-line-by-line overview intended to make the implementation easier to understand
-and maintain.
-
 ## Project Structure
 
 ```text
 .
 |-- mp3_download.py      # Main downloader script
-|-- CODE_WALKTHROUGH.md  # Detailed script explanation
+|-- mp3_downloader_gui.py  # Desktop GUI
+|-- Images/
+|   `-- icon.png         # GUI icon
+|-- SETUP_COMMANDS.md    # Cross-platform setup commands
 |-- requirements.txt     # Python dependency list
 |-- songs.txt.example    # Example input file
 |-- README.md

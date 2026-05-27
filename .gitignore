@@ -1,11 +1,32 @@
 __pycache__/
 *.py[cod]
 
+.venv/
+venv/
+env/
+.env/
+.python-version
+
 downloads/
 *.mp3
 *.m4a
 *.webm
 *.part
+*.ytdl
+*.tmp
+*.log
 
 songs.txt
 .env
+
+build/
+dist/
+*.spec
+*.exe
+*.msi
+*.zip
+*.7z
+
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -21,6 +21,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any, Callable
 
 
 DEFAULT_INPUT_FILE = "songs.txt"
@@ -99,12 +100,35 @@ def check_dependencies() -> Path:
     return ffmpeg_path
 
 
+def get_download_title(info: dict | None, fallback: str) -> str:
+    if not info:
+        return fallback
+
+    entries = info.get("entries")
+    if entries:
+        first_entry = next((entry for entry in entries if entry), None)
+        if first_entry:
+            return get_download_title(first_entry, fallback)
+
+    title = info.get("title")
+    uploader = info.get("uploader") or info.get("artist")
+
+    if title and uploader:
+        return f"{uploader} - {title}"
+    if title:
+        return str(title)
+
+    return fallback
+
+
 def download_mp3(
     query: str,
     output_dir: Path,
     archive_file: Path | None,
     ffmpeg_path: Path,
-) -> None:
+    quiet: bool = False,
+    progress_hook: Callable[[dict[str, Any]], None] | None = None,
+) -> str:
     import yt_dlp
 
     output_template = str(output_dir / "%(artist,uploader|Unknown)s - %(title)s.%(ext)s")
@@ -114,7 +138,8 @@ def download_mp3(
         "noplaylist": True,
         "default_search": "ytsearch1",
         "outtmpl": output_template,
-        "quiet": False,
+        "quiet": quiet,
+        "no_warnings": quiet,
         "ignoreerrors": True,
         "ffmpeg_location": str(ffmpeg_path.parent),
         "postprocessors": [
@@ -129,8 +154,16 @@ def download_mp3(
     if archive_file is not None:
         options["download_archive"] = str(archive_file)
 
+    if progress_hook is not None:
+        options["progress_hooks"] = [progress_hook]
+
     with yt_dlp.YoutubeDL(options) as ydl:
-        ydl.download([query])
+        info = ydl.extract_info(query, download=True)
+
+    if info is None:
+        raise RuntimeError("No downloadable result was found.")
+
+    return get_download_title(info, query)
 
 
 def parse_args() -> argparse.Namespace:
