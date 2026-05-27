@@ -22,6 +22,10 @@ songs.txt
 build/
 dist/
 *.spec
+*.exe
+*.msi
+*.zip
+*.7z
 
 .DS_Store
 Thumbs.db
