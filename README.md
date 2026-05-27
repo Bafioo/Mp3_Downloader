@@ -117,6 +117,14 @@ copy .\songs.txt.example .\songs.txt
 
 ## Usage
 
+The project has two entry points:
+
+- `mp3_download.py` contains the core download logic and the command-line
+  interface.
+- `mp3_downloader_gui.py` is the desktop interface. It imports and uses the
+  functions from `mp3_download.py`, so both files must stay in the same project
+  folder.
+
 ### Desktop GUI
 
 Launch the graphical interface:
@@ -133,6 +141,66 @@ From the GUI you can:
 - Enable or disable duplicate-download tracking
 - Read an activity log with the current download title, estimated time remaining, and completion status
 - Start the download without typing command-line arguments
+
+### GUI Tutorial
+
+1. Activate the virtual environment you created during installation.
+
+   On macOS:
+
+   ```shell
+   source .venv/bin/activate
+   ```
+
+   On Windows:
+
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+2. Start the GUI:
+
+   On macOS:
+
+   ```shell
+   python mp3_downloader_gui.py
+   ```
+
+   On Windows:
+
+   ```powershell
+   python .\mp3_downloader_gui.py
+   ```
+
+3. Choose the output folder.
+
+   This is where the downloaded MP3 files will be saved. The default folder is
+   `downloads`.
+
+4. Choose how to provide songs.
+
+   In the **Song list** tab, click **Browse** and select a text file containing
+   one song per line, for example:
+
+   ```text
+   Artist - Title
+   Artist; Title
+   Artist | Title
+   ```
+
+   In the **YouTube links** tab, paste one or more direct YouTube URLs, using
+   one link per line.
+
+5. Keep duplicate protection enabled unless you want to download the same video
+   again.
+
+   When enabled, the app writes a `downloaded.txt` archive inside the output
+   folder and uses it to skip videos that were already downloaded.
+
+6. Start the download.
+
+   The activity log shows the current title, estimated time remaining, matched
+   result, completion status, or failure reason.
 
 ### Command Line
 
