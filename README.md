@@ -62,7 +62,10 @@ found immediately.
 If you are using the Windows `.exe` release, you do not need to clone the
 repository or install the Python dependencies manually.
 
-1. Open the latest GitHub release.
+Download the executable from the
+[latest GitHub release](https://github.com/Bafioo/Mp3_Downloader/releases/latest).
+
+1. Open the latest GitHub release linked above.
 2. Download the Windows executable from the release assets.
 3. Place the executable in a folder where you want to run the app.
 4. Run the executable.
