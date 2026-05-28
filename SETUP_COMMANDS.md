@@ -112,11 +112,26 @@ ffmpeg -version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
 ```
 
-If Tkinter is missing when using Homebrew Python, install the matching Tkinter
-package or install Python from python.org:
+If Tkinter is missing when using Homebrew Python, install the Tkinter package
+that matches your Python minor version or install Python from python.org:
 
 ```bash
-brew install python-tk@3.13
+python3 --version
+brew install python-tk@3.14
+```
+
+For example, Homebrew Python 3.14 needs `python-tk@3.14`, Python 3.13 needs
+`python-tk@3.13`, and so on. After installing the matching package, recreate the
+virtual environment so it uses the fixed interpreter:
+
+```bash
+deactivate 2>/dev/null || true
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -c "import tkinter; print('tkinter ok')"
 ```
 
 Run the GUI:

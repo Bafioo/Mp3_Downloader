@@ -31,6 +31,15 @@ Tkinter is included with the standard Python installer on Windows and macOS. On
 some Linux distributions, it may need to be installed separately, for example
 with `sudo apt install python3-tk`.
 
+If you use Homebrew Python on macOS, install the Tkinter package that matches
+your Python minor version. For example, Homebrew Python 3.14 needs:
+
+```shell
+brew install python-tk@3.14
+```
+
+Then recreate the virtual environment before launching the GUI.
+
 On macOS, install ffmpeg with Homebrew:
 
 ```shell
@@ -131,6 +140,12 @@ Launch the graphical interface:
 
 ```powershell
 python .\mp3_downloader_gui.py
+```
+
+On macOS or Linux, use:
+
+```shell
+python mp3_downloader_gui.py
 ```
 
 From the GUI you can:
