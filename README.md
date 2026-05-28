@@ -57,6 +57,34 @@ found immediately.
 
 ## Installation
 
+### Windows Executable
+
+If you are using the Windows `.exe` release, you do not need to clone the
+repository or install the Python dependencies manually.
+
+1. Open the latest GitHub release.
+2. Download the Windows executable from the release assets.
+3. Place the executable in a folder where you want to run the app.
+4. Run the executable.
+5. Choose an output folder from the GUI.
+6. Use either:
+   - the **Song list** tab to select a text file with song names
+   - the manual song box in the **Song list** tab to type songs directly
+   - the **YouTube links** tab to paste one or more direct YouTube URLs
+
+If the release notes say that `ffmpeg` is not bundled, install it separately and
+make sure it is available in your system PATH:
+
+```powershell
+winget install --id Gyan.FFmpeg -e
+```
+
+Native Linux and macOS executable releases are planned and will be added in a
+future version. For now, Linux and macOS users should run the app with Python by
+following the installation steps below.
+
+### Python Installation
+
 Clone the repository:
 
 ```shell
@@ -152,6 +180,7 @@ From the GUI you can:
 
 - Choose the output folder for downloaded MP3 files
 - Select a text file containing song names from the **Song list** tab
+- Type song names manually in the **Song list** tab, one song per line
 - Paste one or more direct YouTube URLs from the **YouTube links** tab, using one link per line
 - Enable or disable duplicate-download tracking
 - Read an activity log with the current download title, estimated time remaining, and completion status
@@ -194,14 +223,18 @@ From the GUI you can:
 
 4. Choose how to provide songs.
 
-   In the **Song list** tab, click **Browse** and select a text file containing
-   one song per line, for example:
+   In the **Song list** tab, you can either click **Browse** and select a text
+   file, or write song names manually in the text box below the file selector.
+   Use one song per line, for example:
 
    ```text
    Artist - Title
    Artist; Title
    Artist | Title
    ```
+
+   If the manual text box contains songs, the GUI uses those manual entries
+   first. If the manual box is empty, it uses the selected file.
 
    In the **YouTube links** tab, paste one or more direct YouTube URLs, using
    one link per line.

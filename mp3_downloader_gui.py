@@ -24,16 +24,33 @@ from mp3_download import (
     download_mp3,
     get_download_title,
     load_queries,
+    normalize_song_line,
 )
 
 
-SONG_LIST_WINDOW_SIZE = "760x550"
+SONG_LIST_WINDOW_SIZE = "760x650"
 YOUTUBE_LINKS_WINDOW_SIZE = "760x620"
-SONG_LIST_NOTEBOOK_HEIGHT = 140
+SONG_LIST_NOTEBOOK_HEIGHT = 250
 YOUTUBE_LINKS_NOTEBOOK_HEIGHT = 220
-SONG_LIST_LOG_HEIGHT = 8
+SONG_LIST_LOG_HEIGHT = 10
 YOUTUBE_LINKS_LOG_HEIGHT = 10
 ICON_PATH = Path(__file__).resolve().parent / "Images" / "icon.png"
+
+
+def load_queries_from_text(text: str) -> list[str]:
+    queries: list[str] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+
+        if not line or line.startswith("#"):
+            continue
+
+        normalized = normalize_song_line(line)
+        if normalized:
+            queries.append(normalized)
+
+    return queries
 
 
 
@@ -147,15 +164,32 @@ class Mp3DownloaderGui(tk.Tk):
 
         ttk.Label(
             list_tab,
-            text="The file should contain one song per line, such as Artist - Title.",
-        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(8, 16))
+            text="Use a file, or write songs below. Manual entries are used first.",
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(8, 8))
+
+        manual_songs_frame = ttk.Frame(list_tab)
+        manual_songs_frame.grid(row=2, column=0, columnspan=3, sticky="nsew")
+        manual_songs_frame.columnconfigure(0, weight=1)
+        manual_songs_frame.rowconfigure(0, weight=1)
+        list_tab.rowconfigure(2, weight=1)
+
+        self.manual_songs_text = tk.Text(manual_songs_frame, height=5, wrap="word")
+        self.manual_songs_text.grid(row=0, column=0, sticky="nsew")
+
+        manual_songs_scrollbar = ttk.Scrollbar(
+            manual_songs_frame,
+            orient="vertical",
+            command=self.manual_songs_text.yview,
+        )
+        manual_songs_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.manual_songs_text.configure(yscrollcommand=manual_songs_scrollbar.set)
 
         self.list_button = ttk.Button(
             list_tab,
-            text="Download from selected file",
+            text="Download songs",
             command=self._download_from_file,
         )
-        self.list_button.grid(row=2, column=0, columnspan=3, sticky="ew")
+        self.list_button.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(16, 0))
 
         link_tab = ttk.Frame(self.notebook, padding=16)
         link_tab.columnconfigure(1, weight=1)
@@ -233,9 +267,17 @@ class Mp3DownloaderGui(tk.Tk):
             self.output_dir.set(selected_dir)
 
     def _download_from_file(self) -> None:
+        manual_text = self.manual_songs_text.get("1.0", "end")
+        manual_queries = load_queries_from_text(manual_text)
         input_file = Path(self.input_file.get()).expanduser()
         output_dir = Path(self.output_dir.get()).expanduser()
         use_archive = self.use_archive.get()
+
+        if manual_queries:
+            self._start_worker(
+                lambda: self._run_manual_download(manual_queries, output_dir, use_archive),
+            )
+            return
 
         if not input_file.exists():
             messagebox.showerror("Missing file", "Choose a valid song-list file.")
@@ -244,6 +286,16 @@ class Mp3DownloaderGui(tk.Tk):
         self._start_worker(
             lambda: self._run_file_download(input_file, output_dir, use_archive),
         )
+
+    def _run_manual_download(
+        self, queries: list[str], output_dir: Path, use_archive: bool
+    ) -> None:
+        try:
+            self._download_named_queries(queries, output_dir.resolve(), use_archive)
+        except Exception as exc:
+            self._log(f"ERROR: {exc}")
+        finally:
+            self._set_buttons_enabled(True)
 
     def _download_from_urls(self) -> None:
         raw_urls = self.youtube_urls_text.get("1.0", "end")
