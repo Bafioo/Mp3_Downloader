@@ -26,6 +26,7 @@ dist/
 *.msi
 *.zip
 *.7z
+*.dmg
 
 .DS_Store
 Thumbs.db

@@ -140,6 +140,26 @@ Run the GUI:
 python mp3_downloader_gui.py
 ```
 
+Build a macOS `.app` bundle:
+
+```bash
+python -m pip install -r requirements-build.txt
+./scripts/build_macos_app.sh
+```
+
+The build output is written to `dist/MP3 Downloader.app`. Build the app on the
+same CPU architecture you plan to release, for example Apple Silicon on Apple
+Silicon or Intel on Intel. If `ffmpeg` is available in PATH during the build,
+the script includes it in the app bundle; otherwise users must install `ffmpeg`
+separately.
+
+Create a zip archive for a GitHub release:
+
+```bash
+cd dist
+ditto -c -k --sequesterRsrc --keepParent "MP3 Downloader.app" "MP3 Downloader-macOS.zip"
+```
+
 Run the CLI:
 
 ```bash
