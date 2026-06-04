@@ -57,18 +57,20 @@ found immediately.
 
 ## Installation
 
-### Windows Executable
+### Desktop Executables
 
-If you are using the Windows `.exe` release, you do not need to clone the
+If you are using a desktop executable release, you do not need to clone the
 repository or install the Python dependencies manually.
 
 Download the executable from the
 [latest GitHub release](https://github.com/Bafioo/Mp3_Downloader/releases/latest).
 
 1. Open the latest GitHub release linked above.
-2. Download the Windows executable from the release assets.
-3. Place the executable in a folder where you want to run the app.
-4. Run the executable.
+2. Download the asset for your operating system, such as the Windows `.exe` or
+   the macOS `.app` archive.
+3. Place or extract the executable in a folder where you want to run the app.
+4. Run the executable. On macOS, if Gatekeeper blocks the app, right-click it,
+   choose **Open**, and confirm that you want to open it.
 5. Choose an output folder from the GUI.
 6. Use either:
    - the **Song list** tab to select a text file with song names
@@ -82,9 +84,15 @@ make sure it is available in your system PATH:
 winget install --id Gyan.FFmpeg -e
 ```
 
-Native Linux and macOS executable releases are planned and will be added in a
-future version. For now, Linux and macOS users should run the app with Python by
-following the installation steps below.
+On macOS:
+
+```shell
+brew install ffmpeg
+```
+
+Native Linux executable releases are planned and will be added in a future
+version. For now, Linux users should run the app with Python by following the
+installation steps below.
 
 ### Python Installation
 
@@ -319,8 +327,11 @@ the same YouTube video more than once.
 |-- mp3_downloader_gui.py  # Desktop GUI
 |-- Images/
 |   `-- icon.png         # GUI icon
+|-- scripts/
+|   `-- build_macos_app.sh  # macOS app build helper
 |-- SETUP_COMMANDS.md    # Cross-platform setup commands
 |-- requirements.txt     # Python dependency list
+|-- requirements-build.txt  # Build dependency list
 |-- songs.txt.example    # Example input file
 |-- README.md
 `-- .gitignore

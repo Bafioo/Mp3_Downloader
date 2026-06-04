@@ -62,6 +62,19 @@ def normalize_song_line(line: str) -> str:
 
 
 def find_ffmpeg() -> Path | None:
+    executable_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+
+    bundled_root = getattr(sys, "_MEIPASS", None)
+    if bundled_root:
+        bundled_ffmpeg = Path(bundled_root) / executable_name
+        if bundled_ffmpeg.exists():
+            return bundled_ffmpeg
+
+    executable_dir = Path(sys.executable).resolve().parent
+    bundled_ffmpeg = executable_dir / executable_name
+    if bundled_ffmpeg.exists():
+        return bundled_ffmpeg
+
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path:
         return Path(ffmpeg_path)
