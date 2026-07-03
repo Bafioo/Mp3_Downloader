@@ -29,9 +29,9 @@ from mp3_download import (
 
 
 SONG_LIST_WINDOW_SIZE = "860x650"
-YOUTUBE_LINKS_WINDOW_SIZE = "860x620"
+YOUTUBE_LINKS_WINDOW_SIZE = "860x650"
 SONG_LIST_NOTEBOOK_HEIGHT = 250
-YOUTUBE_LINKS_NOTEBOOK_HEIGHT = 220
+YOUTUBE_LINKS_NOTEBOOK_HEIGHT = 250
 SONG_LIST_LOG_HEIGHT = 10
 YOUTUBE_LINKS_LOG_HEIGHT = 10
 ICON_PATH = Path(__file__).resolve().parent / "Images" / "icon.png"
@@ -192,7 +192,7 @@ class Mp3DownloaderGui(tk.Tk):
         self.list_button.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(16, 0))
 
         link_tab = ttk.Frame(self.notebook, padding=16)
-        link_tab.columnconfigure(1, weight=1)
+        link_tab.columnconfigure(0, weight=1)
         self.notebook.add(link_tab, text="YouTube links")
 
         ttk.Label(link_tab, text="YouTube URLs").grid(row=0, column=0, sticky="w")
@@ -373,7 +373,19 @@ class Mp3DownloaderGui(tk.Tk):
                 self._log(f"Found: {query} -> {title}")
                 self._log(f"Completed: {title}")
             except Exception as exc:
-                self._log(f"{query} -> failed: {exc}")
+                msg = str(exc).lower()
+                if any(k in msg for k in ("http", "url", "connection", "timeout", "network", "socket", "ssl", "failed to resolve", "getaddrinfo", "dns")):
+                    self._log(f"{query} Had a: [CONNECTION ERROR] ")
+                elif any(k in msg for k in ("youtube", "api", "quota", "rate limit")):
+                    self._log(f"{query} Had a: [API ERROR]")
+                else:
+                    self._log(f"{query} Had a: [DOWNLOAD ERROR]")
+            except Exception as exc:
+                # Fallback for any other unexpected errors
+                self._log(f"{query} Had a: [UNKNOWN ERROR] ")
+
+                # self._log(f"{query} -> failed: {self._short_error(exc)}")
+                #self._log(f"{query} -> Failed to download check your internet")
 
     def _download_direct_urls(
         self, urls: list[str], output_dir: Path, use_archive: bool
@@ -395,7 +407,7 @@ class Mp3DownloaderGui(tk.Tk):
                 )
                 self._log(f"Completed: {title}")
             except Exception as exc:
-                self._log(f"{url} -> failed: {exc}")
+                self._log(f"{url} -> failed: {self._short_error(exc)}")
 
     def _make_progress_hook(self, fallback_title: str) -> Callable[[dict], None]:
         last_eta_bucket: int | None = None
@@ -452,6 +464,10 @@ class Mp3DownloaderGui(tk.Tk):
 
     def _log(self, message: str) -> None:
         self.log_queue.put(message)
+
+    def _short_error(self, exc: Exception) -> str:
+        """Return a concise representation of an exception (first line, max 200 chars)."""
+        return str(exc).splitlines()[0][:200]
 
     def _poll_log_queue(self) -> None:
         while True:

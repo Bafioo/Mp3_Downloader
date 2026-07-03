@@ -20,6 +20,8 @@ import argparse
 import os
 import shutil
 import sys
+import yt_dlp
+import yt_dlp.utils
 from pathlib import Path
 from typing import Any, Callable
 
@@ -133,14 +135,25 @@ def download_mp3(
 
     output_template = str(output_dir / "%(artist,uploader|Unknown)s - %(title)s.%(ext)s")
 
+    class SilentLogger:
+        def debug(self, msg):
+            pass
+        def info(self, msg):
+            pass
+        def warning(self, msg):
+            pass
+        def error(self, msg):
+            print(f"[YT-DLP ERROR]", file=sys.stderr)
+
     options = {
         "format": "bestaudio/best",
         "noplaylist": True,
         "default_search": "ytsearch1",
         "outtmpl": output_template,
+        "logger": SilentLogger(),
         "quiet": quiet,
         "no_warnings": quiet,
-        "ignoreerrors": True,
+        "ignoreerrors": False,
         "ffmpeg_location": str(ffmpeg_path.parent),
         "postprocessors": [
             {
@@ -212,7 +225,7 @@ def main() -> int:
         print("[INFO] No songs found in the input file.")
         return 0
 
-    print(f"[INFO] Songs found: {len(queries)}")
+
 
     if args.dry_run:
         for query in queries:
@@ -226,18 +239,25 @@ def main() -> int:
         return 1
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[INFO] FFmpeg: {ffmpeg_path}")
+
+    saved_files = 0
 
     for index, query in enumerate(queries, start=1):
-        print(f"\n[{index}/{len(queries)}] Searching and downloading: {query}")
         try:
             download_mp3(query, output_dir, archive_file, ffmpeg_path)
-        except Exception as exc:  # yt-dlp raises different exceptions depending on the error.
-            print(f"[ERROR] Download failed for '{query}': {exc}", file=sys.stderr)
-
-    print(f"\n[DONE] Files saved in: {output_dir}")
-    return 0
-
+            saved_files += 1
+        except yt_dlp.utils.DownloadError as exc:
+            # yt-dlp specific download errors (e.g., network, extraction)
+            msg = str(exc).lower()
+            if any(k in msg for k in ("http", "url", "connection", "timeout", "network", "socket", "ssl", "failed to resolve", "getaddrinfo", "dns")):
+                print(f"[CONNECTION ERROR] ", file=sys.stderr)
+            elif any(k in msg for k in ("youtube", "api", "quota", "rate limit")):
+                print(f"[API ERROR]", file=sys.stderr)
+            else:
+                print(f"[DOWNLOAD ERROR]", file=sys.stderr)
+        except Exception as exc:
+            # Fallback for any other unexpected errors
+            print(f"[UNKNOWN ERROR] ", file=sys.stderr)
 
 if __name__ == "__main__":
     raise SystemExit(main())
