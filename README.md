@@ -4,9 +4,9 @@ MP3 Downloader is a small Python tool that reads a list of songs, searches
 YouTube for each entry, and saves the best audio result as an MP3 file. It can
 be used from the command line or through a simple desktop interface.
 
-It is built on top of [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and `ffmpeg`,
-with a simple text-file workflow that makes it easy to process many tracks at
-once.
+It is built on top of [`yt-dlp`](https://github.com/yt-dlp/yt-dlp),
+`yt-dlp-ejs`, a supported JavaScript runtime, and `ffmpeg`, with a simple
+text-file workflow that makes it easy to process many tracks at once.
 
 ## Features
 
@@ -24,6 +24,9 @@ once.
 
 - Python 3.10 or newer
 - [`ffmpeg`](https://ffmpeg.org/) installed and available in your system PATH
+  or installed through Gyan.FFmpeg on Windows
+- A supported JavaScript runtime for `yt-dlp` YouTube extraction:
+  Deno 2.3+ is recommended, Node.js 22+ is also supported
 - Python dependencies from `requirements.txt`
 - Tkinter for the desktop GUI
 
@@ -40,10 +43,10 @@ brew install python-tk@3.14
 
 Then recreate the virtual environment before launching the GUI.
 
-On macOS, install ffmpeg with Homebrew:
+On macOS, install ffmpeg and Deno with Homebrew:
 
 ```shell
-brew install ffmpeg
+brew install ffmpeg deno
 ```
 
 On Windows, you can install ffmpeg with:
@@ -53,7 +56,32 @@ winget install --id Gyan.FFmpeg -e
 ```
 
 After installing ffmpeg, open a new terminal if the `ffmpeg` command is not
-found immediately.
+found immediately. The app also checks the standard Gyan.FFmpeg WinGet package
+folder when ffmpeg is installed but not exposed in PATH.
+
+Install Deno:
+
+```powershell
+winget install --id DenoLand.Deno -e
+```
+
+Or use Node.js LTS:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS -e
+```
+
+If you need to point the app at a manual install, use these environment
+variables:
+
+```text
+MP3_DOWNLOADER_FFMPEG_PATH=/path/to/ffmpeg-or-bin-folder
+MP3_DOWNLOADER_JS_RUNTIME=node
+MP3_DOWNLOADER_NODE_PATH=/path/to/node-or-bin-folder
+MP3_DOWNLOADER_SOURCE_ADDRESS=0.0.0.0
+MP3_DOWNLOADER_COOKIES_FILE=/path/to/cookies.txt
+MP3_DOWNLOADER_COOKIES_BROWSER=chrome
+```
 
 ## Installation
 
@@ -77,17 +105,18 @@ Download the executable from the
    - the manual song box in the **Song list** tab to type songs directly
    - the **YouTube links** tab to paste one or more direct YouTube URLs
 
-If the release notes say that `ffmpeg` is not bundled, install it separately and
-make sure it is available in your system PATH:
+If the release notes say that `ffmpeg` or a JavaScript runtime is not bundled,
+install them separately and make sure they are available in your system PATH:
 
 ```powershell
 winget install --id Gyan.FFmpeg -e
+winget install --id DenoLand.Deno -e
 ```
 
 On macOS:
 
 ```shell
-brew install ffmpeg
+brew install ffmpeg deno
 ```
 
 Native Linux executable releases are planned and will be added in a future
@@ -127,12 +156,15 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install the Python dependency inside the activated virtual environment:
+Install the Python dependencies inside the activated virtual environment:
 
 ```shell
 python -m pip install -U pip
 python -m pip install -U -r requirements.txt
 ```
+
+`requirements.txt` uses `yt-dlp[default]`, which installs `yt-dlp-ejs` together
+with the matching `yt-dlp` release.
 
 For complete Windows, macOS, and Linux setup commands, see
 [`SETUP_COMMANDS.md`](SETUP_COMMANDS.md).
@@ -196,6 +228,30 @@ From the GUI you can:
 - Enable or disable duplicate-download tracking
 - Read an activity log with the current download title, estimated time remaining, and completion status
 - Start the download without typing command-line arguments
+
+### Build Executables
+
+Install build dependencies:
+
+```shell
+python -m pip install -r requirements-build.txt
+```
+
+On Windows:
+
+```powershell
+.\scripts\build_windows_app.ps1
+```
+
+On macOS:
+
+```shell
+./scripts/build_macos_app.sh
+```
+
+The build scripts include the full `yt-dlp-ejs` package and try to bundle
+ffmpeg, ffprobe, and a JavaScript runtime when those binaries are available and
+readable on the build machine.
 
 ### GUI Tutorial
 
@@ -329,6 +385,9 @@ the same YouTube video more than once.
 |   `-- icon.png         # GUI icon
 |-- scripts/
 |   `-- build_macos_app.sh  # macOS app build helper
+|   `-- build_windows_app.ps1  # Windows app build helper
+|-- tests/
+|   `-- test_mp3_download.py  # Unit tests
 |-- SETUP_COMMANDS.md    # Cross-platform setup commands
 |-- requirements.txt     # Python dependency list
 |-- requirements-build.txt  # Build dependency list

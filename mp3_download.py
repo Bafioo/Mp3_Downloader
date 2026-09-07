@@ -18,16 +18,88 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
+import subprocess
 import sys
-import yt_dlp
-import yt_dlp.utils
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 
 DEFAULT_INPUT_FILE = "songs.txt"
 DEFAULT_OUTPUT_DIR = "downloads"
+YTDLP_EJS_INSTALL_COMMAND = 'python -m pip install -U "yt-dlp[default]"'
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+@dataclass(frozen=True)
+class JavascriptRuntime:
+    name: str
+    path: Path
+    version: str | None = None
+
+
+@dataclass(frozen=True)
+class RuntimeDependencies:
+    ffmpeg_path: Path
+    ffprobe_path: Path | None
+    javascript_runtime: JavascriptRuntime
+
+
+ERROR_CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "JAVASCRIPT RUNTIME ERROR",
+        (
+            "javascript runtime",
+            "js runtime",
+            "jsc",
+            "ejs",
+            "node",
+            "deno",
+            "quickjs",
+            "n challenge",
+            "signature",
+        ),
+    ),
+    (
+        "FFMPEG ERROR",
+        ("ffmpeg", "ffprobe", "postprocess", "post-process", "unable to convert"),
+    ),
+    (
+        "CONNECTION ERROR",
+        (
+            "urlopen",
+            "connection",
+            "timeout",
+            "network",
+            "socket",
+            "ssl",
+            "failed to resolve",
+            "getaddrinfo",
+            "dns",
+            "temporarily unavailable",
+        ),
+    ),
+    (
+        "AUTH ERROR",
+        ("403", "forbidden", "sign in", "login", "cookies", "not a bot", "captcha"),
+    ),
+    (
+        "API ERROR",
+        ("quota", "rate limit", "too many requests", "429"),
+    ),
+    (
+        "NO RESULT",
+        (
+            "no downloadable",
+            "no video",
+            "no result",
+            "unable to extract",
+            "unsupported url",
+        ),
+    ),
+)
 
 
 def load_queries(input_file: Path) -> list[str]:
@@ -63,56 +135,306 @@ def normalize_song_line(line: str) -> str:
     return line
 
 
-def find_ffmpeg() -> Path | None:
-    executable_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+def _platform_executable_name(name: str) -> str:
+    return f"{name}.exe" if os.name == "nt" else name
 
-    bundled_root = getattr(sys, "_MEIPASS", None)
-    if bundled_root:
-        bundled_ffmpeg = Path(bundled_root) / executable_name
-        if bundled_ffmpeg.exists():
-            return bundled_ffmpeg
 
-    executable_dir = Path(sys.executable).resolve().parent
-    bundled_ffmpeg = executable_dir / executable_name
-    if bundled_ffmpeg.exists():
-        return bundled_ffmpeg
+def _safe_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
 
-    ffmpeg_path = shutil.which("ffmpeg")
-    if ffmpeg_path:
-        return Path(ffmpeg_path)
 
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if not local_app_data:
+def _safe_iter_dirs(path: Path) -> list[Path]:
+    try:
+        children = list(path.iterdir())
+    except OSError:
+        return []
+
+    dirs: list[Path] = []
+    for child in children:
+        try:
+            if child.is_dir():
+                dirs.append(child)
+        except OSError:
+            continue
+
+    return sorted(dirs, key=lambda candidate: candidate.name.lower(), reverse=True)
+
+
+def _unique_paths(paths: Iterable[Path]) -> Iterable[Path]:
+    seen: set[str] = set()
+
+    for path in paths:
+        key = str(path).lower() if os.name == "nt" else str(path)
+        if key in seen:
+            continue
+
+        seen.add(key)
+        yield path
+
+
+def _check_executable_output(
+    executable: Path,
+    args: tuple[str, ...],
+    timeout: int = 8,
+) -> str | None:
+    try:
+        completed = subprocess.run(
+            [str(executable), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
         return None
+
+    if completed.returncode != 0:
+        return None
+
+    return "\n".join(
+        part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+    )
+
+
+def _is_usable_executable(executable: Path, args: tuple[str, ...]) -> bool:
+    return _check_executable_output(executable, args) is not None
+
+
+def _candidate_from_env(env_var: str, executable_name: str) -> Path | None:
+    configured = os.environ.get(env_var)
+    if not configured:
+        return None
+
+    candidate = Path(configured).expanduser()
+    if candidate.suffix or candidate.name.lower() == executable_name.lower():
+        return candidate
+
+    return candidate / executable_name
+
+
+def _iter_bundled_executable_candidates(executable_name: str) -> Iterable[Path]:
+    bundled_root = getattr(sys, "_MEIPASS", None)
+    roots = [
+        Path(bundled_root) if bundled_root else None,
+        Path(sys.executable).resolve().parent,
+        Path(__file__).resolve().parent,
+    ]
+
+    for root in roots:
+        if root is None:
+            continue
+
+        yield root / executable_name
+        yield root / "bin" / executable_name
+
+
+def _iter_winget_ffmpeg_candidates(executable_name: str) -> Iterable[Path]:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if os.name != "nt" or not local_app_data:
+        return
 
     winget_packages = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
-    if not winget_packages.exists():
+    if not _safe_exists(winget_packages):
+        return
+
+    try:
+        package_dirs = list(winget_packages.glob("Gyan.FFmpeg_*"))
+    except OSError:
+        return
+
+    for package_dir in sorted(
+        package_dirs,
+        key=lambda candidate: candidate.name.lower(),
+        reverse=True,
+    ):
+        for build_dir in _safe_iter_dirs(package_dir):
+            yield build_dir / "bin" / executable_name
+
+
+def _iter_ffmpeg_candidates(executable_name: str) -> Iterable[Path]:
+    env_candidate = _candidate_from_env("MP3_DOWNLOADER_FFMPEG_PATH", executable_name)
+    if env_candidate is not None:
+        yield env_candidate
+
+    yield from _iter_bundled_executable_candidates(executable_name)
+
+    path_candidate = shutil.which(executable_name)
+    if path_candidate:
+        yield Path(path_candidate)
+
+    yield from _iter_winget_ffmpeg_candidates(executable_name)
+
+
+def _looks_like_winget_ffmpeg_candidate(path: Path, executable_name: str) -> bool:
+    normalized = str(path).lower()
+    return (
+        os.name == "nt"
+        and "\\microsoft\\winget\\packages\\gyan.ffmpeg_" in normalized
+        and normalized.endswith(f"\\bin\\{executable_name.lower()}")
+    )
+
+
+def find_ffmpeg() -> Path | None:
+    executable_name = _platform_executable_name("ffmpeg")
+    winget_fallback: Path | None = None
+
+    for candidate in _unique_paths(_iter_ffmpeg_candidates(executable_name)):
+        if _is_usable_executable(candidate, ("-version",)):
+            return candidate
+
+        if _looks_like_winget_ffmpeg_candidate(candidate, executable_name):
+            winget_fallback = winget_fallback or candidate
+
+    return winget_fallback
+
+
+def find_ffprobe(ffmpeg_path: Path | None = None) -> Path | None:
+    executable_name = _platform_executable_name("ffprobe")
+    winget_fallback: Path | None = None
+
+    candidates: list[Path] = []
+    if ffmpeg_path is not None:
+        candidates.append(ffmpeg_path.parent / executable_name)
+
+    candidates.extend(_iter_ffmpeg_candidates(executable_name))
+
+    for candidate in _unique_paths(candidates):
+        if _is_usable_executable(candidate, ("-version",)):
+            return candidate
+
+        if _looks_like_winget_ffmpeg_candidate(candidate, executable_name):
+            winget_fallback = winget_fallback or candidate
+
+    return winget_fallback
+
+
+def _runtime_executable_names(runtime_name: str) -> tuple[str, ...]:
+    names = {
+        "deno": ("deno",),
+        "node": ("node",),
+        "quickjs": ("qjs", "quickjs"),
+        "bun": ("bun",),
+    }.get(runtime_name, (runtime_name,))
+    return tuple(_platform_executable_name(name) for name in names)
+
+
+def _parse_version_tuple(output: str) -> tuple[int, ...] | None:
+    match = re.search(r"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?", output)
+    if not match:
         return None
 
-    matches = sorted(winget_packages.glob("Gyan.FFmpeg_*/*/bin/ffmpeg.exe"))
-    if matches:
-        return matches[-1]
+    return tuple(int(part) for part in match.groups(default="0"))
+
+
+def _version_meets_requirement(
+    runtime_name: str,
+    version: tuple[int, ...] | None,
+) -> bool:
+    if version is None:
+        return True
+
+    minimum_versions = {
+        "deno": (2, 3, 0),
+        "node": (22, 0, 0),
+        "quickjs": (2023, 12, 9),
+        "bun": (1, 2, 11),
+    }
+    maximum_versions = {
+        "bun": (1, 3, 14),
+    }
+
+    minimum_version = minimum_versions.get(runtime_name)
+    maximum_version = maximum_versions.get(runtime_name)
+
+    if minimum_version and version < minimum_version:
+        return False
+
+    if maximum_version and version > maximum_version:
+        return False
+
+    return True
+
+
+def _iter_javascript_runtime_names() -> Iterable[str]:
+    configured_runtime = os.environ.get("MP3_DOWNLOADER_JS_RUNTIME")
+    if configured_runtime:
+        yield configured_runtime.lower()
+
+    yield from ("deno", "node", "quickjs")
+
+
+def _iter_javascript_runtime_candidates(runtime_name: str) -> Iterable[Path]:
+    env_candidate = os.environ.get(f"MP3_DOWNLOADER_{runtime_name.upper()}_PATH")
+
+    for executable_name in _runtime_executable_names(runtime_name):
+        if env_candidate:
+            configured_path = Path(env_candidate).expanduser()
+            yield (
+                configured_path / executable_name
+                if not configured_path.suffix
+                else configured_path
+            )
+
+        yield from _iter_bundled_executable_candidates(executable_name)
+
+        path_candidate = shutil.which(executable_name)
+        if path_candidate:
+            yield Path(path_candidate)
+
+
+def find_javascript_runtime() -> JavascriptRuntime | None:
+    for runtime_name in dict.fromkeys(_iter_javascript_runtime_names()):
+        for candidate in _unique_paths(_iter_javascript_runtime_candidates(runtime_name)):
+            output = _check_executable_output(candidate, ("--version",))
+            if output is None:
+                continue
+
+            version = _parse_version_tuple(output or "")
+            if not _version_meets_requirement(runtime_name, version):
+                continue
+
+            version_text = ".".join(str(part) for part in version) if version else None
+            return JavascriptRuntime(runtime_name, candidate, version_text)
 
     return None
 
 
-def check_dependencies() -> Path:
+def check_dependencies() -> RuntimeDependencies:
     try:
         import yt_dlp  # noqa: F401
     except ImportError as exc:
         raise RuntimeError(
             "yt-dlp is missing. Install the dependency with:\n"
-            "  python -m pip install -U yt-dlp"
+            f"  {YTDLP_EJS_INSTALL_COMMAND}"
         ) from exc
 
     ffmpeg_path = find_ffmpeg()
     if ffmpeg_path is None:
         raise RuntimeError(
             "ffmpeg is missing, and it is required to convert audio to MP3.\n"
-            "Install ffmpeg and make sure the 'ffmpeg' command is available in PATH."
+            "Install ffmpeg and make sure the 'ffmpeg' command is available in PATH, "
+            "or set MP3_DOWNLOADER_FFMPEG_PATH to the ffmpeg executable or bin folder."
         )
 
-    return ffmpeg_path
+    javascript_runtime = find_javascript_runtime()
+    if javascript_runtime is None:
+        raise RuntimeError(
+            "No supported JavaScript runtime was found. Recent yt-dlp versions need "
+            "one for full YouTube support.\n"
+            "Install Deno 2.3+ or Node.js 22+, then reopen the terminal so PATH is "
+            "refreshed. You can also set MP3_DOWNLOADER_JS_RUNTIME=node and "
+            "MP3_DOWNLOADER_NODE_PATH to node.exe."
+        )
+
+    return RuntimeDependencies(
+        ffmpeg_path=ffmpeg_path,
+        ffprobe_path=find_ffprobe(ffmpeg_path),
+        javascript_runtime=javascript_runtime,
+    )
 
 
 def get_download_title(info: dict | None, fallback: str) -> str:
@@ -136,38 +458,68 @@ def get_download_title(info: dict | None, fallback: str) -> str:
     return fallback
 
 
-def download_mp3(
-    query: str,
+def short_error(exc: BaseException, max_length: int = 240) -> str:
+    message = ANSI_ESCAPE_RE.sub("", str(exc)).strip() or exc.__class__.__name__
+    first_line = next(
+        (line.strip() for line in message.splitlines() if line.strip()),
+        message,
+    )
+    return first_line[:max_length]
+
+
+def classify_download_error(exc: BaseException) -> tuple[str, str]:
+    detail = short_error(exc)
+    lower_detail = str(exc).lower()
+
+    for category, keywords in ERROR_CATEGORIES:
+        if any(keyword in lower_detail for keyword in keywords):
+            return category, detail
+
+    return "DOWNLOAD ERROR", detail
+
+
+def build_ydl_options(
     output_dir: Path,
     archive_file: Path | None,
     ffmpeg_path: Path,
-    quiet: bool = False,
-    progress_hook: Callable[[dict[str, Any]], None] | None = None,
-) -> str:
-    import yt_dlp
+    quiet: bool,
+    progress_hook: Callable[[dict[str, Any]], None] | None,
+    js_runtime: JavascriptRuntime | None,
+) -> dict[str, Any]:
+    output_template = str(
+        output_dir / "%(artist,uploader|Unknown)s - %(title)s.%(ext)s"
+    )
 
-    output_template = str(output_dir / "%(artist,uploader|Unknown)s - %(title)s.%(ext)s")
+    class YtDlpLogger:
+        def debug(self, msg: str) -> None:
+            pass
 
-    class SilentLogger:
-        def debug(self, msg):
+        def info(self, msg: str) -> None:
             pass
-        def info(self, msg):
-            pass
-        def warning(self, msg):
-            pass
-        def error(self, msg):
-            print(f"[YT-DLP ERROR]", file=sys.stderr)
 
-    options = {
-        "format": "bestaudio/best",
+        def warning(self, msg: str) -> None:
+            if not quiet:
+                print(f"[YT-DLP WARNING] {msg}", file=sys.stderr)
+
+        def error(self, msg: str) -> None:
+            if not quiet:
+                print(f"[YT-DLP ERROR] {msg}", file=sys.stderr)
+
+    options: dict[str, Any] = {
+        "format": "bestaudio[ext=m4a]/bestaudio",
         "noplaylist": True,
         "default_search": "ytsearch1",
         "outtmpl": output_template,
-        "logger": SilentLogger(),
+        "logger": YtDlpLogger(),
         "quiet": quiet,
         "no_warnings": quiet,
         "ignoreerrors": False,
         "ffmpeg_location": str(ffmpeg_path.parent),
+        "remote_components": [],
+        "source_address": os.environ.get("MP3_DOWNLOADER_SOURCE_ADDRESS", "0.0.0.0"),
+        "retries": 3,
+        "fragment_retries": 3,
+        "extractor_retries": 3,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -177,14 +529,73 @@ def download_mp3(
         ],
     }
 
+    if js_runtime is not None:
+        options["js_runtimes"] = {js_runtime.name: {"path": str(js_runtime.path)}}
+
+    try:
+        import curl_cffi  # noqa: F401
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+
+        options["impersonate"] = ImpersonateTarget.from_str("chrome")
+    except Exception:
+        pass
+
+    cookies_file = os.environ.get("MP3_DOWNLOADER_COOKIES_FILE")
+    if cookies_file:
+        options["cookiefile"] = str(Path(cookies_file).expanduser())
+
+    cookies_browser = os.environ.get("MP3_DOWNLOADER_COOKIES_BROWSER")
+    if cookies_browser:
+        options["cookiesfrombrowser"] = (cookies_browser,)
+
     if archive_file is not None:
         options["download_archive"] = str(archive_file)
 
     if progress_hook is not None:
         options["progress_hooks"] = [progress_hook]
 
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(query, download=True)
+    return options
+
+
+def _is_forbidden_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "403" in text or "forbidden" in text
+
+
+def download_mp3(
+    query: str,
+    output_dir: Path,
+    archive_file: Path | None,
+    ffmpeg_path: Path,
+    quiet: bool = False,
+    progress_hook: Callable[[dict[str, Any]], None] | None = None,
+    js_runtime: JavascriptRuntime | None = None,
+) -> str:
+    import yt_dlp
+
+    if js_runtime is None:
+        js_runtime = find_javascript_runtime()
+
+    options = build_ydl_options(
+        output_dir,
+        archive_file,
+        ffmpeg_path,
+        quiet,
+        progress_hook,
+        js_runtime,
+    )
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(query, download=True)
+    except Exception as exc:
+        if not _is_forbidden_error(exc):
+            raise
+
+        fallback_options = dict(options)
+        fallback_options["format"] = "bestaudio/best"
+        fallback_options["extractor_args"] = {"youtube": {"player_client": ["android"]}}
+        with yt_dlp.YoutubeDL(fallback_options) as ydl:
+            info = ydl.extract_info(query, download=True)
 
     if info is None:
         raise RuntimeError("No downloadable result was found.")
@@ -238,39 +649,46 @@ def main() -> int:
         print("[INFO] No songs found in the input file.")
         return 0
 
-
-
     if args.dry_run:
         for query in queries:
             print(f"  ytsearch1:{query}")
         return 0
 
     try:
-        ffmpeg_path = check_dependencies()
+        dependencies = check_dependencies()
     except RuntimeError as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    saved_files = 0
+    completed_downloads = 0
+    failed_downloads = 0
 
     for index, query in enumerate(queries, start=1):
         try:
-            download_mp3(query, output_dir, archive_file, ffmpeg_path)
-            saved_files += 1
-        except yt_dlp.utils.DownloadError as exc:
-            # yt-dlp specific download errors (e.g., network, extraction)
-            msg = str(exc).lower()
-            if any(k in msg for k in ("http", "url", "connection", "timeout", "network", "socket", "ssl", "failed to resolve", "getaddrinfo", "dns")):
-                print(f"[CONNECTION ERROR] ", file=sys.stderr)
-            elif any(k in msg for k in ("youtube", "api", "quota", "rate limit")):
-                print(f"[API ERROR]", file=sys.stderr)
-            else:
-                print(f"[DOWNLOAD ERROR]", file=sys.stderr)
+            title = download_mp3(
+                query,
+                output_dir,
+                archive_file,
+                dependencies.ffmpeg_path,
+                js_runtime=dependencies.javascript_runtime,
+            )
+            completed_downloads += 1
+            print(f"[OK] {index}/{len(queries)} {query} -> {title}")
         except Exception as exc:
-            # Fallback for any other unexpected errors
-            print(f"[UNKNOWN ERROR] ", file=sys.stderr)
+            failed_downloads += 1
+            category, detail = classify_download_error(exc)
+            print(
+                f"[{category}] {index}/{len(queries)} {query}: {detail}",
+                file=sys.stderr,
+            )
+
+    print(
+        f"[INFO] Finished. Completed: {completed_downloads}. Failed: {failed_downloads}."
+    )
+    return 1 if failed_downloads else 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

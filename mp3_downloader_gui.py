@@ -21,10 +21,12 @@ from mp3_download import (
     DEFAULT_INPUT_FILE,
     DEFAULT_OUTPUT_DIR,
     check_dependencies,
+    classify_download_error,
     download_mp3,
     get_download_title,
     load_queries,
     normalize_song_line,
+    short_error,
 )
 
 
@@ -355,7 +357,7 @@ class Mp3DownloaderGui(tk.Tk):
     def _download_named_queries(
         self, queries: list[str], output_dir: Path, use_archive: bool
     ) -> None:
-        ffmpeg_path = check_dependencies()
+        dependencies = check_dependencies()
         output_dir.mkdir(parents=True, exist_ok=True)
         archive_file = output_dir / "downloaded.txt" if use_archive else None
 
@@ -366,31 +368,21 @@ class Mp3DownloaderGui(tk.Tk):
                     query,
                     output_dir,
                     archive_file,
-                    ffmpeg_path,
+                    dependencies.ffmpeg_path,
                     quiet=True,
                     progress_hook=progress_hook,
+                    js_runtime=dependencies.javascript_runtime,
                 )
                 self._log(f"Found: {query} -> {title}")
                 self._log(f"Completed: {title}")
             except Exception as exc:
-                msg = str(exc).lower()
-                if any(k in msg for k in ("http", "url", "connection", "timeout", "network", "socket", "ssl", "failed to resolve", "getaddrinfo", "dns")):
-                    self._log(f"{query} Had a: [CONNECTION ERROR] ")
-                elif any(k in msg for k in ("youtube", "api", "quota", "rate limit")):
-                    self._log(f"{query} Had a: [API ERROR]")
-                else:
-                    self._log(f"{query} Had a: [DOWNLOAD ERROR]")
-            except Exception as exc:
-                # Fallback for any other unexpected errors
-                self._log(f"{query} Had a: [UNKNOWN ERROR] ")
-
-                # self._log(f"{query} -> failed: {self._short_error(exc)}")
-                #self._log(f"{query} -> Failed to download check your internet")
+                category, detail = classify_download_error(exc)
+                self._log(f"{query} -> {category}: {detail}")
 
     def _download_direct_urls(
         self, urls: list[str], output_dir: Path, use_archive: bool
     ) -> None:
-        ffmpeg_path = check_dependencies()
+        dependencies = check_dependencies()
         output_dir.mkdir(parents=True, exist_ok=True)
         archive_file = output_dir / "downloaded.txt" if use_archive else None
 
@@ -401,13 +393,15 @@ class Mp3DownloaderGui(tk.Tk):
                     url,
                     output_dir,
                     archive_file,
-                    ffmpeg_path,
+                    dependencies.ffmpeg_path,
                     quiet=True,
                     progress_hook=progress_hook,
+                    js_runtime=dependencies.javascript_runtime,
                 )
                 self._log(f"Completed: {title}")
             except Exception as exc:
-                self._log(f"{url} -> failed: {self._short_error(exc)}")
+                category, detail = classify_download_error(exc)
+                self._log(f"{url} -> {category}: {detail}")
 
     def _make_progress_hook(self, fallback_title: str) -> Callable[[dict], None]:
         last_eta_bucket: int | None = None
@@ -467,7 +461,7 @@ class Mp3DownloaderGui(tk.Tk):
 
     def _short_error(self, exc: Exception) -> str:
         """Return a concise representation of an exception (first line, max 200 chars)."""
-        return str(exc).splitlines()[0][:200]
+        return short_error(exc, max_length=200)
 
     def _poll_log_queue(self) -> None:
         while True:

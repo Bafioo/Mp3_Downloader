@@ -20,6 +20,12 @@ if ! "$PYTHON_BIN" -c "import PyInstaller" >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! "$PYTHON_BIN" -c "import yt_dlp, yt_dlp_ejs" >/dev/null 2>&1; then
+  echo "yt-dlp with EJS support is not installed. Run:" >&2
+  echo "  $PYTHON_BIN -m pip install -U -r requirements.txt" >&2
+  exit 1
+fi
+
 if [[ ! -f "$ICON_PNG" ]]; then
   echo "Missing app icon: $ICON_PNG" >&2
   exit 1
@@ -46,6 +52,10 @@ pyinstaller_args=(
   --windowed
   --name "$APP_NAME"
   --add-data "$ICON_PNG:Images"
+  --collect-all yt_dlp_ejs
+  --hidden-import yt_dlp_ejs
+  --hidden-import yt_dlp_ejs.yt
+  --hidden-import yt_dlp_ejs.yt.solver
 )
 
 if iconutil -c icns "$ICONSET_DIR" -o "$ICON_ICNS"; then
@@ -59,6 +69,27 @@ if command -v ffmpeg >/dev/null 2>&1; then
 else
   echo "ffmpeg was not found in PATH, so it will not be bundled." >&2
   echo "The built app will require ffmpeg to be installed separately." >&2
+fi
+
+if command -v ffprobe >/dev/null 2>&1; then
+  pyinstaller_args+=(--add-binary "$(command -v ffprobe):.")
+else
+  echo "ffprobe was not found in PATH, so it will not be bundled." >&2
+fi
+
+js_runtime=""
+for candidate in deno node qjs quickjs; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    js_runtime="$(command -v "$candidate")"
+    break
+  fi
+done
+
+if [[ -n "$js_runtime" ]]; then
+  pyinstaller_args+=(--add-binary "$js_runtime:.")
+else
+  echo "No JavaScript runtime was found in PATH, so none will be bundled." >&2
+  echo "The built app will require Deno 2.3+ or Node.js 22+ to be installed separately." >&2
 fi
 
 "$PYTHON_BIN" -m PyInstaller "${pyinstaller_args[@]}" "$ENTRYPOINT"

@@ -9,12 +9,19 @@ Run the commands from the project folder after cloning the repository.
 
 Open PowerShell.
 
-Install Python, Git, and ffmpeg:
+Install Python, Git, ffmpeg, and Deno:
 
 ```powershell
 winget install --id Python.Python.3.13 -e
 winget install --id Git.Git -e
 winget install --id Gyan.FFmpeg -e
+winget install --id DenoLand.Deno -e
+```
+
+Node.js 22+ also works instead of Deno:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS -e
 ```
 
 Close and reopen PowerShell so PATH changes are loaded.
@@ -36,28 +43,39 @@ Install Python dependencies:
 
 ```powershell
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install --upgrade -r requirements.txt
 ```
 
-`requirements.txt` installs `yt-dlp`. To install or update it directly:
+`requirements.txt` installs `yt-dlp[default]`, including the matching
+`yt-dlp-ejs` package. To update it directly:
 
 ```powershell
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade "yt-dlp[default]"
 ```
 
 Verify the installation:
 
 ```powershell
 python -m yt_dlp --version
+python -c "import yt_dlp_ejs; print('yt-dlp-ejs ok')"
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
+deno --version
 python -m py_compile .\mp3_download.py .\mp3_downloader_gui.py
+python -c "from mp3_download import check_dependencies; print(check_dependencies())"
 ```
 
 Run the GUI:
 
 ```powershell
 python .\mp3_downloader_gui.py
+```
+
+Build a Windows executable:
+
+```powershell
+python -m pip install -r requirements-build.txt
+.\scripts\build_windows_app.ps1
 ```
 
 Run the CLI:
@@ -77,10 +95,10 @@ Install Homebrew if it is not installed:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Install Python, Git, and ffmpeg:
+Install Python, Git, ffmpeg, and Deno:
 
 ```bash
-brew install python git ffmpeg
+brew install python git ffmpeg deno
 ```
 
 Create and activate a virtual environment:
@@ -94,22 +112,26 @@ Install Python dependencies:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install --upgrade -r requirements.txt
 ```
 
-`requirements.txt` installs `yt-dlp`. To install or update it directly:
+`requirements.txt` installs `yt-dlp[default]`, including the matching
+`yt-dlp-ejs` package. To update it directly:
 
 ```bash
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade "yt-dlp[default]"
 ```
 
 Verify the installation:
 
 ```bash
 python -m yt_dlp --version
+python -c "import yt_dlp_ejs; print('yt-dlp-ejs ok')"
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
+deno --version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
+python -c "from mp3_download import check_dependencies; print(check_dependencies())"
 ```
 
 If Tkinter is missing when using Homebrew Python, install the Tkinter package
@@ -130,7 +152,7 @@ rm -rf .venv
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install --upgrade -r requirements.txt
 python -c "import tkinter; print('tkinter ok')"
 ```
 
@@ -149,9 +171,9 @@ python -m pip install -r requirements-build.txt
 
 The build output is written to `dist/MP3 Downloader.app`. Build the app on the
 same CPU architecture you plan to release, for example Apple Silicon on Apple
-Silicon or Intel on Intel. If `ffmpeg` is available in PATH during the build,
-the script includes it in the app bundle; otherwise users must install `ffmpeg`
-separately.
+Silicon or Intel on Intel. If ffmpeg, ffprobe, and a JavaScript runtime are
+available and readable during the build, the script includes them in the app
+bundle; otherwise users must install missing binaries separately.
 
 Create a zip archive for a GitHub release:
 
@@ -173,31 +195,39 @@ python mp3_download.py
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-pip python3-venv python3-tk ffmpeg git
+sudo apt install -y python3 python3-pip python3-venv python3-tk ffmpeg git curl
+curl -fsSL https://deno.land/install.sh | sh
+export PATH="$HOME/.deno/bin:$PATH"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade -r requirements.txt
 python -m yt_dlp --version
+python -c "import yt_dlp_ejs; print('yt-dlp-ejs ok')"
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
+deno --version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
+python -c "from mp3_download import check_dependencies; print(check_dependencies())"
 ```
 
 ### Fedora
 
 ```bash
-sudo dnf install -y python3 python3-pip python3-tkinter ffmpeg git
+sudo dnf install -y python3 python3-pip python3-tkinter ffmpeg git curl
+curl -fsSL https://deno.land/install.sh | sh
+export PATH="$HOME/.deno/bin:$PATH"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade -r requirements.txt
 python -m yt_dlp --version
+python -c "import yt_dlp_ejs; print('yt-dlp-ejs ok')"
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
+deno --version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
+python -c "from mp3_download import check_dependencies; print(check_dependencies())"
 ```
 
 If Fedora cannot find `ffmpeg`, enable RPM Fusion for your Fedora version and
@@ -206,31 +236,34 @@ then install `ffmpeg` again.
 ### Arch Linux
 
 ```bash
-sudo pacman -Syu --needed python python-pip tk ffmpeg git
+sudo pacman -Syu --needed python python-pip tk ffmpeg git deno
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade -r requirements.txt
 python -m yt_dlp --version
+python -c "import yt_dlp_ejs; print('yt-dlp-ejs ok')"
 python -c "import tkinter; print('tkinter ok')"
 ffmpeg -version
+deno --version
 python -m py_compile mp3_download.py mp3_downloader_gui.py
+python -c "from mp3_download import check_dependencies; print(check_dependencies())"
 ```
 
 ## yt-dlp Notes
 
 `yt-dlp` is the Python library and command-line engine used to search YouTube
-and download audio streams. This project installs it through:
+and download audio streams. This project installs it with the `default` extra
+so `yt-dlp-ejs` stays aligned with the installed `yt-dlp` release:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-To update only `yt-dlp` later:
+To update `yt-dlp` and EJS later:
 
 ```bash
-python -m pip install --upgrade yt-dlp
+python -m pip install --upgrade "yt-dlp[default]"
 ```
 
 To check the installed version:
