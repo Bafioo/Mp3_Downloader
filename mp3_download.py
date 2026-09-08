@@ -104,6 +104,14 @@ ERROR_CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+def _ensure_utf8_console() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def load_queries(input_file: Path) -> list[str]:
     if not input_file.exists():
         raise FileNotFoundError(f"File not found: {input_file}")
@@ -761,6 +769,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    _ensure_utf8_console()
     args = parse_args()
 
     input_file = Path(args.input).expanduser().resolve()

@@ -14,6 +14,7 @@ from typing import Callable
 from mp3_download import (
     DEFAULT_INPUT_FILE,
     DEFAULT_OUTPUT_DIR,
+    _ensure_utf8_console,
     check_dependencies,
     classify_download_error,
     download_mp3,
@@ -528,6 +529,7 @@ class Mp3DownloaderGui(tk.Tk):
 
 
 def main() -> int:
+    _ensure_utf8_console()
     app = Mp3DownloaderGui()
     app.mainloop()
     return 0
