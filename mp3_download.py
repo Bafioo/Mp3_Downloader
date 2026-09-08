@@ -24,11 +24,12 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence
 
 
 DEFAULT_INPUT_FILE = "songs.txt"
 DEFAULT_OUTPUT_DIR = "downloads"
+DEFAULT_COOKIES_FILE = "cookies.txt"
 YTDLP_EJS_INSTALL_COMMAND = 'python -m pip install -U "yt-dlp[default]"'
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -75,6 +76,7 @@ ERROR_CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "network",
             "socket",
             "ssl",
+            "failed to connect",
             "failed to resolve",
             "getaddrinfo",
             "dns",
@@ -83,7 +85,7 @@ ERROR_CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "AUTH ERROR",
-        ("403", "forbidden", "sign in", "login", "cookies", "not a bot", "captcha"),
+        ("403", "forbidden", "sign in", "login", "cookies", "not a bot", "captcha", "dpapi"),
     ),
     (
         "API ERROR",
@@ -230,6 +232,30 @@ def _iter_bundled_executable_candidates(executable_name: str) -> Iterable[Path]:
 
         yield root / executable_name
         yield root / "bin" / executable_name
+
+
+def find_cookies_file() -> Path | None:
+    configured = os.environ.get("MP3_DOWNLOADER_COOKIES_FILE")
+    candidates: list[Path] = []
+    if configured:
+        candidates.append(Path(configured).expanduser())
+
+    bundled_root = getattr(sys, "_MEIPASS", None)
+    roots = [
+        Path(sys.executable).resolve().parent,
+        Path(bundled_root) if bundled_root else None,
+        Path(__file__).resolve().parent,
+        Path.cwd(),
+    ]
+    for root in roots:
+        if root is not None:
+            candidates.append(root / DEFAULT_COOKIES_FILE)
+
+    for candidate in _unique_paths(candidates):
+        if _safe_exists(candidate):
+            return candidate
+
+    return None
 
 
 def _iter_winget_ffmpeg_candidates(executable_name: str) -> Iterable[Path]:
@@ -471,6 +497,12 @@ def classify_download_error(exc: BaseException) -> tuple[str, str]:
     detail = short_error(exc)
     lower_detail = str(exc).lower()
 
+    if "sign in to confirm your age" in lower_detail:
+        return (
+            "AUTH ERROR",
+            "video con limite eta/login. esporta cookies.txt e mettilo accanto all'app.",
+        )
+
     for category, keywords in ERROR_CATEGORIES:
         if any(keyword in lower_detail for keyword in keywords):
             return category, detail
@@ -485,6 +517,7 @@ def build_ydl_options(
     quiet: bool,
     progress_hook: Callable[[dict[str, Any]], None] | None,
     js_runtime: JavascriptRuntime | None,
+    cookies_browser: str | None = None,
 ) -> dict[str, Any]:
     output_template = str(
         output_dir / "%(artist,uploader|Unknown)s - %(title)s.%(ext)s"
@@ -540,11 +573,11 @@ def build_ydl_options(
     except Exception:
         pass
 
-    cookies_file = os.environ.get("MP3_DOWNLOADER_COOKIES_FILE")
+    cookies_file = find_cookies_file()
     if cookies_file:
-        options["cookiefile"] = str(Path(cookies_file).expanduser())
+        options["cookiefile"] = str(cookies_file)
 
-    cookies_browser = os.environ.get("MP3_DOWNLOADER_COOKIES_BROWSER")
+    cookies_browser = cookies_browser or os.environ.get("MP3_DOWNLOADER_COOKIES_BROWSER")
     if cookies_browser:
         options["cookiesfrombrowser"] = (cookies_browser,)
 
@@ -562,6 +595,56 @@ def _is_forbidden_error(exc: BaseException) -> bool:
     return "403" in text or "forbidden" in text
 
 
+def _is_cookie_load_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "cookie" in text and (
+        "could not copy" in text
+        or "could not find" in text
+        or "permission denied" in text
+        or "failed to load cookies" in text
+    )
+
+
+def _is_age_or_login_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "sign in to confirm your age" in text or "confirm your age" in text
+
+
+def _looks_like_url(value: str) -> bool:
+    return bool(re.match(r"^[a-z][a-z0-9+.-]*://", value, flags=re.IGNORECASE))
+
+
+def _search_query_variants(query: str) -> list[str]:
+    variants = [query]
+    lowered = query.lower()
+    if "thasupreme" in lowered:
+        variants.append(re.sub("thasupreme", "thasup", query, flags=re.IGNORECASE))
+        variants.append(re.sub("thasupreme", "tha supreme", query, flags=re.IGNORECASE))
+    if re.search(r"\bfuck ex\b", lowered):
+        variants.extend(
+            re.sub(r"\bfuck ex\b", "fuck 3x", variant, flags=re.IGNORECASE)
+            for variant in list(variants)
+        )
+        variants.append("thasup fuck ex lyrics")
+        variants.append("fuck ex tha supreme lyrics")
+    return list(dict.fromkeys(variants))
+
+
+def _iter_cookie_browsers(cookies_browser: str | Sequence[str] | None) -> Iterable[str | None]:
+    if cookies_browser is None:
+        yield None
+        return
+
+    browsers = (
+        [part.strip() for part in cookies_browser.split(",")]
+        if isinstance(cookies_browser, str)
+        else list(cookies_browser)
+    )
+    for browser in browsers:
+        if browser:
+            yield browser
+
+
 def download_mp3(
     query: str,
     output_dir: Path,
@@ -570,32 +653,77 @@ def download_mp3(
     quiet: bool = False,
     progress_hook: Callable[[dict[str, Any]], None] | None = None,
     js_runtime: JavascriptRuntime | None = None,
+    cookies_browser: str | Sequence[str] | None = None,
 ) -> str:
     import yt_dlp
 
     if js_runtime is None:
         js_runtime = find_javascript_runtime()
 
-    options = build_ydl_options(
-        output_dir,
-        archive_file,
-        ffmpeg_path,
-        quiet,
-        progress_hook,
-        js_runtime,
-    )
-    try:
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(query, download=True)
-    except Exception as exc:
-        if not _is_forbidden_error(exc):
-            raise
+    last_cookie_error: Exception | None = None
+    for browser in _iter_cookie_browsers(cookies_browser):
+        options = build_ydl_options(
+            output_dir,
+            archive_file,
+            ffmpeg_path,
+            quiet,
+            progress_hook,
+            js_runtime,
+            browser,
+        )
+        try:
+            if _looks_like_url(query):
+                candidates = [query]
+            else:
+                candidates = []
+                for search_query in _search_query_variants(query):
+                    search_options = dict(options)
+                    search_options["skip_download"] = True
+                    search_options["extract_flat"] = "in_playlist"
+                    with yt_dlp.YoutubeDL(search_options) as ydl:
+                        search_info = ydl.extract_info(
+                            f"ytsearch8:{search_query}", download=False
+                        )
+                    candidates.extend(
+                        entry.get("webpage_url")
+                        or f"https://www.youtube.com/watch?v={entry['id']}"
+                        for entry in (search_info.get("entries") or [])
+                        if entry and (entry.get("webpage_url") or entry.get("id"))
+                    )
+                candidates = list(dict.fromkeys(candidates))
 
-        fallback_options = dict(options)
-        fallback_options["format"] = "bestaudio/best"
-        fallback_options["extractor_args"] = {"youtube": {"player_client": ["android"]}}
-        with yt_dlp.YoutubeDL(fallback_options) as ydl:
-            info = ydl.extract_info(query, download=True)
+            last_candidate_error: Exception | None = None
+            for candidate in candidates:
+                try:
+                    with yt_dlp.YoutubeDL(options) as ydl:
+                        info = ydl.extract_info(candidate, download=True)
+                    break
+                except Exception as candidate_exc:
+                    if _is_age_or_login_error(candidate_exc):
+                        last_candidate_error = candidate_exc
+                        continue
+                    raise
+            else:
+                if last_candidate_error is not None:
+                    raise last_candidate_error
+                raise RuntimeError("No downloadable result was found.")
+            break
+        except Exception as exc:
+            if _is_cookie_load_error(exc):
+                last_cookie_error = exc
+                continue
+            if not _is_forbidden_error(exc):
+                raise
+
+            fallback_options = dict(options)
+            fallback_options["format"] = "bestaudio/best"
+            fallback_options["extractor_args"] = {"youtube": {"player_client": ["android"]}}
+            with yt_dlp.YoutubeDL(fallback_options) as ydl:
+                info = ydl.extract_info(query, download=True)
+            break
+    else:
+        assert last_cookie_error is not None
+        raise last_cookie_error
 
     if info is None:
         raise RuntimeError("No downloadable result was found.")

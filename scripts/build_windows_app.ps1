@@ -81,6 +81,25 @@ function Find-WingetFfmpegBinary {
     return $null
 }
 
+function Find-PythonDetectedBinary {
+    param([string]$FunctionName)
+
+    try {
+        $Detected = & $Python -c "import mp3_download; path = mp3_download.$FunctionName(); print(path or '')"
+        if ($LASTEXITCODE -eq 0 -and $Detected) {
+            $DetectedPath = ($Detected | Select-Object -Last 1).Trim()
+            if (Test-Path -LiteralPath $DetectedPath) {
+                return $DetectedPath
+            }
+        }
+    }
+    catch {
+        return $null
+    }
+
+    return $null
+}
+
 function Find-JavascriptRuntime {
     $Candidates = @(
         @{ Name = "deno"; Argument = "--version" },
@@ -131,6 +150,9 @@ $FfmpegPath = Get-ApplicationPath -Names @("ffmpeg.exe", "ffmpeg")
 if (-not $FfmpegPath) {
     $FfmpegPath = Find-WingetFfmpegBinary -ExecutableName "ffmpeg.exe"
 }
+if (-not $FfmpegPath) {
+    $FfmpegPath = Find-PythonDetectedBinary -FunctionName "find_ffmpeg"
+}
 if ($FfmpegPath) {
     $PyInstallerArgs += @("--add-binary", "$FfmpegPath;.")
 }
@@ -141,6 +163,9 @@ else {
 $FfprobePath = Get-ApplicationPath -Names @("ffprobe.exe", "ffprobe")
 if (-not $FfprobePath) {
     $FfprobePath = Find-WingetFfmpegBinary -ExecutableName "ffprobe.exe"
+}
+if (-not $FfprobePath) {
+    $FfprobePath = Find-PythonDetectedBinary -FunctionName "find_ffprobe"
 }
 if ($FfprobePath) {
     $PyInstallerArgs += @("--add-binary", "$FfprobePath;.")

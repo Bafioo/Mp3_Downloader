@@ -6,6 +6,9 @@ venv/
 env/
 .env/
 .python-version
+cookies.txt
+*.cookies.txt
+*cookies*.txt
 
 downloads/
 *.mp3
@@ -14,6 +17,7 @@ downloads/
 *.part
 *.ytdl
 *.tmp
+.tmp*/
 *.log
 
 songs.txt
@@ -31,3 +35,4 @@ dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+DESIGN.md

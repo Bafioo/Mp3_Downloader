@@ -67,6 +67,7 @@ class RuntimeOptionTests(unittest.TestCase):
             quiet=True,
             progress_hook=None,
             js_runtime=runtime,
+            cookies_browser=None,
         )
 
         self.assertEqual(
@@ -79,6 +80,49 @@ class RuntimeOptionTests(unittest.TestCase):
         self.assertEqual(options["source_address"], "0.0.0.0")
         self.assertEqual(options["retries"], 3)
         self.assertEqual(options["fragment_retries"], 3)
+
+    def test_build_ydl_options_accepts_browser_cookies(self) -> None:
+        options = mp3_download.build_ydl_options(
+            Path("downloads"),
+            None,
+            Path(r"C:\ffmpeg\bin\ffmpeg.exe"),
+            quiet=True,
+            progress_hook=None,
+            js_runtime=None,
+            cookies_browser="chrome",
+        )
+
+        self.assertEqual(options["cookiesfrombrowser"], ("chrome",))
+
+    def test_iter_cookie_browsers_accepts_fallbacks(self) -> None:
+        self.assertEqual(
+            list(mp3_download._iter_cookie_browsers(("edge", "chrome"))),
+            ["edge", "chrome"],
+        )
+
+    def test_search_query_variants_cover_thasupreme_typo(self) -> None:
+        self.assertIn(
+            "fuck 3x thasup",
+            mp3_download._search_query_variants("fuck ex thasupreme"),
+        )
+
+    def test_cookie_database_missing_is_cookie_load_error(self) -> None:
+        self.assertTrue(
+            mp3_download._is_cookie_load_error(
+                RuntimeError("could not find firefox cookies database")
+            )
+        )
+
+    def test_find_cookies_file_prefers_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cookies_file = Path(temp_dir) / "cookies.txt"
+            cookies_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+
+            with mock.patch.dict(
+                os.environ,
+                {"MP3_DOWNLOADER_COOKIES_FILE": str(cookies_file)},
+            ):
+                self.assertEqual(mp3_download.find_cookies_file(), cookies_file)
 
     @mock.patch.dict(
         os.environ,

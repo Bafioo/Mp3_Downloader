@@ -11,7 +11,7 @@ text-file workflow that makes it easy to process many tracks at once.
 ## Features
 
 - Read songs from a plain-text file
-- Use a simple GUI to choose the song list and output folder
+- Use the DESIGN.md-styled GUI to choose the source and output folder
 - Download direct YouTube links without creating a song-list file
 - Display a custom app icon in the desktop interface
 - Search YouTube automatically using the artist and title
@@ -83,6 +83,10 @@ MP3_DOWNLOADER_COOKIES_FILE=/path/to/cookies.txt
 MP3_DOWNLOADER_COOKIES_BROWSER=chrome
 ```
 
+If YouTube asks for age confirmation or login, put an exported Netscape-format
+`cookies.txt` next to the executable or in the project folder. The app uses it
+automatically before trying browser cookies.
+
 ## Installation
 
 ### Desktop Executables
@@ -101,9 +105,8 @@ Download the executable from the
    choose **Open**, and confirm that you want to open it.
 5. Choose an output folder from the GUI.
 6. Use either:
-   - the **Song list** tab to select a text file with song names
-   - the manual song box in the **Song list** tab to type songs directly
-   - the **YouTube links** tab to paste one or more direct YouTube URLs
+   - `[brani]` to type songs manually or select a text file
+   - `[link]` to paste one or more direct YouTube URLs
 
 If the release notes say that `ffmpeg` or a JavaScript runtime is not bundled,
 install them separately and make sure they are available in your system PATH:
@@ -201,9 +204,9 @@ The project has two entry points:
 
 - `mp3_download.py` contains the core download logic and the command-line
   interface.
-- `mp3_downloader_gui.py` is the desktop interface. It imports and uses the
-  functions from `mp3_download.py`, so both files must stay in the same project
-  folder.
+- `mp3_downloader_gui.py` is the desktop interface. It follows the flat mono
+  style in `DESIGN.md` and imports the download functions from
+  `mp3_download.py`, so both files must stay in the same project folder.
 
 ### Desktop GUI
 
@@ -222,11 +225,11 @@ python mp3_downloader_gui.py
 From the GUI you can:
 
 - Choose the output folder for downloaded MP3 files
-- Select a text file containing song names from the **Song list** tab
-- Type song names manually in the **Song list** tab, one song per line
-- Paste one or more direct YouTube URLs from the **YouTube links** tab, using one link per line
+- Use `[brani]` to select a text file containing song names
+- Type song names manually in `[brani]`, one song per line
+- Use `[link]` to paste one or more direct YouTube URLs, one link per line
 - Enable or disable duplicate-download tracking
-- Read an activity log with the current download title, estimated time remaining, and completion status
+- Read an activity log with the current title, percentage bar, and completion status
 - Start the download without typing command-line arguments
 
 ### Build Executables
@@ -290,8 +293,8 @@ readable on the build machine.
 
 4. Choose how to provide songs.
 
-   In the **Song list** tab, you can either click **Browse** and select a text
-   file, or write song names manually in the text box below the file selector.
+   In `[brani]`, you can either click `file...` and select a text file, or
+   write song names manually in the text box above the file selector.
    Use one song per line, for example:
 
    ```text
@@ -303,8 +306,7 @@ readable on the build machine.
    If the manual text box contains songs, the GUI uses those manual entries
    first. If the manual box is empty, it uses the selected file.
 
-   In the **YouTube links** tab, paste one or more direct YouTube URLs, using
-   one link per line.
+   In `[link]`, paste one or more direct YouTube URLs, using one link per line.
 
 5. Keep duplicate protection enabled unless you want to download the same video
    again.
@@ -314,8 +316,8 @@ readable on the build machine.
 
 6. Start the download.
 
-   The activity log shows the current title, estimated time remaining, matched
-   result, completion status, or failure reason.
+   The activity log shows the current title, percentage bar, completion status,
+   or failure reason.
 
 ### Command Line
 
